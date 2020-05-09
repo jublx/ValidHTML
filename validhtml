@@ -1,0 +1,66 @@
+#!/bin/bash
+
+### Validate HTML files with W3C API. ###
+
+valid() {
+	echo -e "\e[34;1m----- Validation $1 -----\e[0m"
+	while read -r line; do
+		if [[ $line =~ "Error" || $line =~ "error" ]]; then
+			echo -e "\e[38;5;196m"
+		elif [[ $line =~ "Warning" ]]; then
+			echo -e "\e[93m"
+		elif [[ $line =~ "From line" || $line =~ "At line" ]]; then
+			echo -e "\e[1;0m"
+		else
+			echo -e "\e[38;5;118m"
+		fi
+		echo -e "$line"
+	done < <(curl -s -H "Content-Type: text/html; charset=utf-8" --data-binary @$1 https://validator.w3.org/nu/?out=text)
+
+	echo -e "\e[0m"
+	return 0
+}
+
+openXML() {
+	mime=$(mimetype --output-format %m $1)
+	if [ -f $1 ] && [ $mime = "application/xml" ]; then
+		$BROWSER $1 >/dev/null 
+		return 0
+	fi
+	return 1
+}
+
+if [ $# -eq 0 ]; then
+	echo "Please specify at least one file/folder."
+	exit 1
+fi
+
+if [ ! -e /home/$USER/.validhtml_tmp ]; then
+	mkdir /home/$USER/.validhtml_tmp
+fi
+
+for arg in $@; do
+
+	list=$(du -a $arg)
+	for file in $list; do
+		if [ -f $file ]; then
+			mime=$(mimetype --output-format %m $file)
+			if [ $mime = "text/html" ]; then
+				valid $file
+				path=/home/$USER/.validhtml_tmp/`basename $file .html`.xml
+				cp $file $path 
+			fi	
+		fi
+	done
+		
+done
+for i in /home/$USER/.validhtml_tmp/*.xml; do
+	openXML $i 
+done
+
+sleep 2
+if ! rm -r /home/$USER/.validhtml_tmp; then
+	exit 1
+fi
+
+exit 0
